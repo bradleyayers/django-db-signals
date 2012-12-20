@@ -17,17 +17,21 @@ Installation
 
 1. Install from PyPI: ``pip install django-db-signals``.
 2. Add ``'django_db_signals'`` to ``INSTALLED_APPS``.
-3. Enable the signals by adding to your ``models.py``::
+3. Enable the signals by adding to your ``models.py``:
 
-    import django_db_signals
-    django_db_signals.enable()
+   .. code-block:: python
+
+       import django_db_signals
+       django_db_signals.enable()
 
 
 Example
 =======
 
 Let's assume you've installed django-db-signals, and now you'd like to log a
-message each time the database is rolled back::
+message each time the database is rolled back:
+
+.. code-block:: python
 
     from django.db import signals
     from django.dispatch import receiver
@@ -47,7 +51,9 @@ Design
 
 In the same way that Django settings are available via ``django.conf.settings``
 attributes, signals are available via ``django.db.signals`` attributes. As
-such, attempting to import individual signals will fail::
+such, attempting to import individual signals will fail:
+
+.. code-block:: python
 
     >>> import django_db_signals
     >>> django_db_signals.enable()
