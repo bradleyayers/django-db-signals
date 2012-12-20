@@ -51,14 +51,12 @@ such, attempting to import individual signals will fail::
 
     >>> import django_db_signals
     >>> django_db_signals.enable()
-    >>> # GOOD
-    ...
-    >>> from django.db import signals
+
+    >>> from django.db import signals  # GOOD
     >>> signals.pre_commit
     <django.dispatch.dispatcher.Signal object at 0x1089c8b90>
-    >>> # BAD
-    ...
-    >>> from django.db.signals import pre_commit
+
+    >>> from django.db.signals import pre_commit  # BAD
     Traceback (most recent call last):
       File "<stdin>", line 1, in <module>
     ImportError: No module named signals
@@ -67,20 +65,22 @@ such, attempting to import individual signals will fail::
 ``pre_…`` vs ``post_…`` signals
 -------------------------------
 
-A distinction is made between ``pre_…`` and ``post_…`` signals. ``pre_…``
-signals are sent using the normal ``.send(…)`` method, allowing receivers to
-raise exceptions and abort the pending operation.
+``pre_…`` signals are sent *before* an operation occurs. The signals are sent
+via ``.send(…)``. Exceptions raised in receivers are propagated to the
+application. This can be exploited to cancel the operation (e.g. to block a
+commit).
 
-For ``post_…`` signals, the operation has already occurred. As such, it's more
-important to ensure all receivers are called (rather than propagate
-exceptions).
+``post_…`` signals are sent *after* an operation, and as such can't offer the
+same *cancel the pending operation* behaviour. The signal is sent via
+``.send_robust(…)`` to ensure all receivers are called. Any exceptions raised
+are logged, but are not propagated to the application.
 
-For this reason, ``post_…`` signals are sent via ``.send_robust(…)``. Any
-exceptions raised in receivers are logged (via a ``django.db.signals`` logger)
-and then ignored.
 
-This means that unlike ``pre_…`` receivers, exceptions raised from ``post_…``
-receivers will *not* interrupt execution flow of the application.
+Logging
+-------
+
+A logger named ``django.db.signals`` is used to log all exceptions raised in
+``post_…`` receivers.
 
 
 signal senders
