@@ -47,7 +47,7 @@ Design
 
 In the same way that Django settings are available via ``django.conf.settings``
 attributes, signals are available via ``django.db.signals`` attributes. As
-such, attempting to import individual signals will fail:
+such, attempting to import individual signals will fail::
 
     >>> import django_db_signals
     >>> django_db_signals.enable()
