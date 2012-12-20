@@ -1,0 +1,6 @@
+[run]
+source =
+    django_db_signals
+
+[html]
+directory = reports/htmlcov
