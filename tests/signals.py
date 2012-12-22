@@ -5,7 +5,6 @@ from attest import assert_hook, Tests
 from contextlib import contextmanager
 from django.db import connections, DEFAULT_DB_ALIAS, signals, transaction
 from django_attest import TransactionTestContext
-from functools import partial, wraps
 
 
 suite = Tests()
