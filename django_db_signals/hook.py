@@ -10,6 +10,7 @@ import logging
 
 
 logger = logging.getLogger('django.db.signals')
+IS_DJANGO_12 = (1, 2, 0) <= django.VERSION < (1, 3, 0)
 
 
 class DatabaseSignals(object):
@@ -95,15 +96,20 @@ def enter_transaction_management(managed=True, using=None):
 @patch("django.db.transaction.leave_transaction_management")
 def leave_transaction_management(using=None):
     connection = conn(using)
+    # Django 1.2's implementation of leave_transaction_management() calls
+    # the patched rollback() function, however in later versions the unpatched
+    # DatabaseWrapper.rollback() is used. Thus, in 1.2 we don't want to send
+    # [pre/post]_rollback signals, otherwise they'll be sent twice.
+    #
     # If the transaction is dirty, it is rolled back and an exception is
     # raised. We need to send the rollback signal before that happens.
     is_dirty = transaction.is_dirty(using=using)
-    if is_dirty:
+    if is_dirty and not IS_DJANGO_12:
         signals.pre_rollback.send(sender=connection)
     try:
         yield
     finally:
-        if is_dirty:
+        if is_dirty and not IS_DJANGO_12:
             send_robust_and_log_errors("post_rollback", sender=connection)
         send_robust_and_log_errors("post_transaction_management", sender=connection)
 

@@ -12,6 +12,13 @@ This app adds a set of signals to some of Django's database operations:
 - ``django.db.signals.post_transaction_management``
 
 
+Requirements
+============
+
+- Python 2.6/2.7/3.2/3.3 (3.x requires Django >=1.5)
+- Django 1.2/1.3/1.4/1.5
+
+
 Installation
 ============
 

@@ -60,21 +60,26 @@ def log():
             senders.append(sender)
         return handler
 
-    with connect(signals.pre_commit,                  make_handler('…✔')), \
-         connect(signals.post_commit,                 make_handler('✔…')), \
-         connect(signals.pre_rollback,                make_handler('…✘')), \
-         connect(signals.post_rollback,               make_handler('✘…')), \
-         connect(signals.pre_transaction_management,  make_handler('(')), \
-         connect(signals.post_transaction_management, make_handler(')')):
-         yield (log, senders)
+    # Multiple context managers is only supported on >= Python 2.7
+    with connect(signals.pre_commit, make_handler('…✔')):
+        with connect(signals.post_commit, make_handler('✔…')):
+            with connect(signals.pre_rollback, make_handler('…✘')):
+                with connect(signals.post_rollback, make_handler('✘…')):
+                    with connect(signals.pre_transaction_management, make_handler('(')):
+                        with connect(signals.post_transaction_management, make_handler(')')):
+                            yield (log, senders)
 
 
 # -- tests --------------------------------------------------------------------
 
 
 def commit_on_success(client, log, senders, using):
-    with transaction.commit_on_success(using=using):
+    @transaction.commit_on_success(using=using)
+    def test():
         Person.objects.db_manager(using).create(name="foo")
+
+    test()
+
     assert log == ['(', '…✔', '✔…', ')']
     assert senders == [conn(using)] * len(log)
 
@@ -85,8 +90,12 @@ for alias in (None, 'default', 'alternate'):
 
 
 def leave_transaction_management_not_dirty(client, log, senders, using):
-    with transaction.commit_on_success(using=using):
+    @transaction.commit_on_success(using=using)
+    def test():
         pass
+
+    test()
+
     assert log == ['(', ')']
     assert senders == [conn(using)] * len(log)
 
@@ -98,9 +107,12 @@ for alias in (None, 'default', 'alternate'):
 
 def commit_on_success_rollback(client, log, senders, using):
     try:
-        with transaction.commit_on_success(using=using):
+        @transaction.commit_on_success(using=using)
+        def test():
             Person.objects.db_manager(using).create(name="foo")
             raise IndexError
+
+        test()
     except IndexError:
         pass
     assert log == ['(', '…✘', '✘…', ')']
@@ -114,8 +126,11 @@ for alias in (None, 'default', 'alternate'):
 
 def commit_manually_rollback(client, log, senders, using):
     try:
-        with transaction.commit_manually(using=using):
+        @transaction.commit_manually(using=using)
+        def test():
             Person.objects.db_manager(using).create(name="foo")
+
+        test()
     except transaction.TransactionManagementError:
         log.append('!')
     assert log == ['(', '…✘', '✘…', ')', '!']
@@ -128,9 +143,13 @@ for alias in (None, 'default', 'alternate'):
 
 
 def commit_manually_commit(client, log, senders, using):
-    with transaction.commit_manually(using=using):
+    @transaction.commit_manually(using=using)
+    def test():
         Person.objects.db_manager(using).create(name="foo")
         transaction.commit(using=using)
+
+    test()
+
     assert log == ['(', '…✔', '✔…', ')']
     assert senders == [conn(using)] * len(log)
 
@@ -148,9 +167,12 @@ def robust_post_rollback(client, log, senders, using):
         raise Exception
 
     with connect(signals.post_rollback, buggy):
-        with transaction.commit_manually(using=using):
+        @transaction.commit_manually(using=using)
+        def test():
             Person.objects.db_manager(using).create(name="foo")
             transaction.rollback(using=using)
+
+        test()
 
     assert log == ['(', '…✘', '✘…', ')']
     assert senders == [conn(using)] * len(log)
@@ -169,8 +191,11 @@ def robust_post_commit(client, log, senders, using):
         raise Exception
 
     with connect(signals.post_commit, buggy):
-        with transaction.commit_on_success(using=using):
+        @transaction.commit_on_success(using=using)
+        def test():
             Person.objects.db_manager(using).create(name="foo")
+
+        test()
 
     assert log == ['(', '…✔', '✔…', ')']
     assert senders == [conn(using)] * len(log)
@@ -182,9 +207,12 @@ for alias in (None, 'default', 'alternate'):
 
 
 def exit_managed_with_pending_commit(client, log, senders, using):
-    with transaction.commit_manually(using=using):
+    @transaction.commit_manually(using=using)
+    def test():
         Person.objects.db_manager(using).create(name="foo")
         transaction.managed(False, using=using)
+
+    test()
 
     assert Person.objects.using(using).get(name="foo")
     assert log == ['(', '…✔', '✔…', ')']
@@ -197,10 +225,14 @@ for alias in (None, 'default', 'alternate'):
 
 
 def rollback_unless_managed__in_managed(client, log, senders, using):
-    with transaction.commit_on_success(using=using):
+    @transaction.commit_on_success(using=using)
+    def test():
         cursor = conn(using).cursor()
         cursor.execute('INSERT INTO app_person (name) VALUES (%s)', ['foo'])
         transaction.rollback_unless_managed(using=using)
+
+    test()
+
     assert Person.objects.using(using).get(name="foo")
     assert log == ['(', '…✔', '✔…', ')']
     assert senders == [conn(using)] * len(log)
@@ -212,10 +244,14 @@ for alias in (None, 'default', 'alternate'):
 
 
 def rollback_unless_managed__in_auto(client, log, senders, using):
-    with transaction.autocommit(using=using):
+    @transaction.autocommit(using=using)
+    def test():
         cursor = conn(using).cursor()
         cursor.execute('INSERT INTO app_person (name) VALUES (%s)', ['foo'])
         transaction.rollback_unless_managed(using=using)
+
+    test()
+
     assert Person.objects.using(using).filter(name="foo").count() == 0
     assert log == ['(', '…✘', '✘…', ')']
     assert senders == [conn(using)] * len(log)
@@ -229,11 +265,15 @@ for alias in (None, 'default', 'alternate'):
 def commit_unless_managed__in_managed(client, log, senders, using):
     # Being inside a managed block, commit_unless_managed will be a noop, and
     # the `transaction.rollback()` will rollback the INSERT.
-    with transaction.commit_manually(using=using):
+    @transaction.commit_manually(using=using)
+    def test():
         cursor = conn(using).cursor()
         cursor.execute('INSERT INTO app_person (name) VALUES (%s)', ['foo'])
         transaction.commit_unless_managed(using=using)
         transaction.rollback(using=using)
+
+    test()
+
     assert Person.objects.using(using).filter(name="foo").count() == 0
     assert log == ['(', '…✘', '✘…', ')']
     assert senders == [conn(using)] * len(log)
@@ -247,11 +287,15 @@ for alias in (None, 'default', 'alternate'):
 def commit_unless_managed__in_auto(client, log, senders, using):
     # Being inside an auto block, commit_unless_managed will commit, and
     # the `transaction.rollback()` will rollback nothing.
-    with transaction.autocommit(using=using):
+    @transaction.autocommit(using=using)
+    def test():
         cursor = conn(using).cursor()
         cursor.execute('INSERT INTO app_person (name) VALUES (%s)', ['foo'])
         transaction.commit_unless_managed(using=using)
         transaction.rollback(using=using)
+
+    test()
+
     assert Person.objects.using(using).get(name="foo")
     assert log == ['(', '…✔', '✔…', '…✘', '✘…', ')']
     assert senders == [conn(using)] * len(log)
