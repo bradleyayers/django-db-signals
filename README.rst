@@ -82,7 +82,6 @@ such, attempting to import individual signals will fail:
 via ``.send(…)``. Exceptions raised in receivers are propagated to the
 application. This can be exploited to cancel the operation (e.g. to block a
 commit).
-<<<<<<< HEAD
 
 ``post_…`` signals are sent *after* an operation, and as such can't offer the
 same *cancel the pending operation* behaviour. The signal is sent via
@@ -92,20 +91,6 @@ are logged, but are not propagated to the application.
 
 Logging
 -------
-
-A logger named ``django.db.signals`` is used to log all exceptions raised in
-``post_…`` receivers.
-=======
-
-``post_…`` signals are sent *after* an operation, and as such can't offer the
-same *cancel the pending operation* behaviour. The signal is sent via
-``.send_robust(…)`` to ensure all receivers are called. Any exceptions raised
-are logged, but are not propagated to the application.
-
-
-Logging
--------
->>>>>>> Rephrase documentation, minor code cleanup
 
 A logger named ``django.db.signals`` is used to log all exceptions raised in
 ``post_…`` receivers.
