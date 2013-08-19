@@ -46,7 +46,7 @@ message each time the database is rolled back:
 
     logger = logging.getLogger(__name__)
 
-    @reciever(signals.post_rollback)
+    @receiver(signals.post_rollback)
     def log_rollbacks(sender, **kwargs):
         # sender is a DatabaseWrapper object
         logger.info("A rollback occurred on database %s" %
